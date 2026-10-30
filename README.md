@@ -3,7 +3,8 @@ markdown
 qiu-clash
 个人自用的 FlClash 覆写脚本（基于 Smart-Config-Kit v6.0.21 修改）。
 
-订阅地址
+订阅地址:
+
 https://raw.githubusercontent.com/qiuzy1203/qiu-clash/main/flclash-qiu.js
 
 使用
