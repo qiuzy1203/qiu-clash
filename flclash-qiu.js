@@ -1690,7 +1690,12 @@ function main(config) {
       'DOMAIN-SUFFIX,bytegoofy.com,DIRECT',
       'DOMAIN-SUFFIX,bytetos.com,DIRECT',
       'DOMAIN-SUFFIX,snssdk.com,DIRECT',
-      'DOMAIN-SUFFIX,bytedance.com,DIRECT'
+      'DOMAIN-SUFFIX,bytedance.com,DIRECT',
+      // 绿联 NAS 远程访问 / 相册备份：走直连，避免被代理绕出国导致 P2P 打洞失败、备份龟速
+      'DOMAIN-SUFFIX,ugreen.com,DIRECT',
+      'DOMAIN-SUFFIX,ugnas.com,DIRECT',
+      'DOMAIN-SUFFIX,ugnas.cloud,DIRECT',
+      'DOMAIN-SUFFIX,ug.link,DIRECT'
     ]
     if (Array.isArray(config.rules)) {
       // 原地插入（QuickJS FFI 桥接层限制：不能给 config.rules 重新赋值）
