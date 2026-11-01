@@ -1,4 +1,4 @@
-#!name = Block Ads 精准版 v2 | 保留 jq 改写，加回淘宝安全广告域
+#!name = QiuH 去广告 | Block Ads 精准版
 #!desc = 基于 thNylHx/Tools 的 Blockads 裁剪：删大厂域名封杀与核心接口整包替换；v2 加回 adashx / h-adashx.ut / acs4baichuan 三条安全广告域
 #!author = Hermes Agent (derived from thNylHx/Tools)
 #!category = Block Ads
