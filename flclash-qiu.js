@@ -1722,7 +1722,8 @@ function main(config) {
     // 家里已开通联通 IPv6（2408:8207:c5b:6ed0::/60），节点也有 IPv6 出口。
     // 删除本块即恢复作者默认（关闭）。
     config.ipv6 = true
-    if (config.dns) config.dns.ipv6 = true
+    if (!config.dns) config.dns = {}
+    config.dns.ipv6 = true
     // <<< LOCAL PATCH (ipv6)
 
     log(`[${VERSION}] Done! Groups: ${config['proxy-groups'].length}, Rules: ${config.rules.length}, Providers: ${Object.keys(config['rule-providers']).length}`)
