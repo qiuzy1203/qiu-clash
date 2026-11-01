@@ -28,14 +28,14 @@ https://raw.githubusercontent.com/qiuzy1203/qiu-clash/main/flclash-qiu.js
 
 ---
 
-## 二、Surge 模块（Block Ads 精准版）
+## 二、Surge 模块（QiuH 去广告 | Block Ads 精准版）
 
 基于 thNylHx/Tools 的 Blockads 模块裁剪：删除针对淘宝 / 抖音 / 微信 / QQ 的域名封杀与大厂接口整包替换，保留 1119 条 jq 字段级改写。
 
 **模块地址（复制这一行）**
 
 ```
-https://raw.githubusercontent.com/qiuzy1203/qiu-clash/main/Blockads-Precise.sgmodule
+https://raw.githubusercontent.com/qiuzy1203/qiu-clash/main/Blockads-QiuH.sgmodule
 ```
 
 **使用**
