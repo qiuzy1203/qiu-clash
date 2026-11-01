@@ -1717,6 +1717,14 @@ function main(config) {
       }
     }
     // <<< LOCAL PATCH (minimax global)
+    // >>> LOCAL PATCH (qiuh) : 启用 IPv6
+    // 脚本默认 config.ipv6=false / dns.ipv6=false，会屏蔽 AAAA 解析；
+    // 家里已开通联通 IPv6（2408:8207:c5b:6ed0::/60），节点也有 IPv6 出口。
+    // 删除本块即恢复作者默认（关闭）。
+    config.ipv6 = true
+    if (config.dns) config.dns.ipv6 = true
+    // <<< LOCAL PATCH (ipv6)
+
     log(`[${VERSION}] Done! Groups: ${config['proxy-groups'].length}, Rules: ${config.rules.length}, Providers: ${Object.keys(config['rule-providers']).length}`)
     return config
   } catch (e) {
