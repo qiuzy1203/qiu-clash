@@ -1709,7 +1709,10 @@ function main(config) {
     // agent.minimaxi.com（国内站点），导致国际版令牌被判 invalid access token。
     // 放在 rules 最前，保证先于 DIRECT 类规则匹配。删除本块即恢复原行为。
     var LOCAL_PROXY_RULES = [
-      'DOMAIN-SUFFIX,minimax.io,🤖 AI 服务'
+      'DOMAIN-SUFFIX,minimax.io,🤖 AI 服务',
+      // Meta AI（Muse）：ai.meta.com 由 042-social 命中走「📱 社交媒体」，
+      // 但 meta.ai 不在那个规则集里，会掉到「国外网站」。统一并到 AI 服务组。
+      'DOMAIN-SUFFIX,meta.ai,🤖 AI 服务'
     ]
     if (Array.isArray(config.rules)) {
       for (var pi = LOCAL_PROXY_RULES.length - 1; pi >= 0; pi--) {
