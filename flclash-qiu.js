@@ -1728,6 +1728,77 @@ function main(config) {
     if (!config.dns) config.dns = {}
     config.dns.ipv6 = true
     // <<< LOCAL PATCH (ipv6)
+    // >>> LOCAL PATCH (qiuh) : 手动锁定组 + 业务组默认成员
+    // url-test 每 300 秒按延迟自动换节点：账号/支付/流媒体对出口 IP 敏感，会触发风控或掉解锁；
+    // 而「美国/美洲」池里混着自建 4 条（无限流量），自动择优会一直挑机场，白吃配额。
+    // 删除本块即恢复上游默认。
+    ;(function () {
+      var LOCK = ['🇭🇰 香港节点', '🇸🇬 狮城节点', '🇺🇸 美国节点', '🌎 美洲节点']
+      var BIZ_FIRST = {
+        '🤖 AI 服务': '🌏 其他节点',
+        '📱 社交媒体': '🇭🇰 香港节点',
+        '🏦 金融支付': '🇭🇰 香港节点',
+        '💰 加密货币': '🇭🇰 香港节点',
+        '🧑‍💼 会议协作': '🇭🇰 香港节点',
+        '🎥 Netflix': '🇺🇸 美国节点',
+        '🎬 Disney+': '🇺🇸 美国节点',
+        '📡 HBO/Max': '🇺🇸 美国节点',
+        '📺 Hulu': '🇺🇸 美国节点',
+        '🎬 Prime Video': '🇺🇸 美国节点',
+        '📥 下载更新': '🚀 自建节点',
+        '🛰️ BT/PT Tracker': '🚀 自建节点'
+      }
+      var groups = config['proxy-groups'] || []
+      var i, j, k
+      function idxOf(name) {
+        for (var n = 0; n < groups.length; n++) { if (groups[n] && groups[n].name === name) return n }
+        return -1
+      }
+      // 1) 指定区域组改成 select（手动锁定，不再自动切换）
+      for (i = 0; i < groups.length; i++) {
+        var g = groups[i]
+        if (!g || LOCK.indexOf(g.name) === -1) continue
+        g.type = 'select'
+        delete g.url; delete g.interval; delete g.tolerance; delete g.lazy
+      }
+      // 2) 自建节点单独成组（无限流量，下载/BT 走它，省机场配额）
+      var SELF_RE = /(trojan|vless|tuic|hysteria2)-USA/i
+      var selfNames = (config.proxies || []).map(function (p) { return p.name }).filter(function (n) { return SELF_RE.test(n) })
+      if (selfNames.length && idxOf('🚀 自建节点') === -1) {
+        var at = idxOf('🌍 全球节点')
+        var ng = { name: '🚀 自建节点', type: 'select', proxies: selfNames.slice() }
+        if (at >= 0) groups.splice(at + 1, 0, ng); else groups.push(ng)
+      }
+      // 3) hy2 从所有 url-test 池剔除：握手通但数据传不下来，会被测成“最快”导致整机断网
+      for (j = 0; j < groups.length; j++) {
+        var u = groups[j]
+        if (!u || u.type !== 'url-test' || !Array.isArray(u.proxies)) continue
+        u.proxies = u.proxies.filter(function (n) { return !/hysteria2-USA/i.test(n) })
+      }
+      // 4) 业务组默认成员（select 的默认 = 第一个成员）；目标组不在成员里就先插进去
+      for (k = 0; k < groups.length; k++) {
+        var b = groups[k]
+        if (!b || !BIZ_FIRST[b.name] || !Array.isArray(b.proxies)) continue
+        var want = BIZ_FIRST[b.name]
+        if (idxOf(want) === -1) continue
+        b.proxies = [want].concat(b.proxies.filter(function (n) { return n !== want }))
+      }
+      // 5) 「全球节点」改成地区组的选择器（成员是各组，不是 41 个裸节点）
+      var gi = idxOf('🌍 全球节点')
+      if (gi !== -1) {
+        var REGION = ['🇭🇰 香港节点', '🇹🇼 台湾节点', '🇸🇬 狮城节点', '🇯🇵 日韩节点', '🌏 亚太节点',
+                      '🇺🇸 美国节点', '🇪🇺 欧洲节点', '🌎 美洲节点', '🌏 其他节点', '🚀 自建节点']
+        var members = REGION.filter(function (n) { return idxOf(n) !== -1 })
+        if (members.length) {
+          var gg = groups[gi]
+          gg.type = 'select'
+          delete gg.url; delete gg.interval; delete gg.tolerance; delete gg.lazy
+          gg.proxies = members
+        }
+      }
+      log(`[${VERSION}] LOCAL PATCH manual-lock: ${LOCK.join(' / ')} -> select; 自建组=${selfNames.length}; 业务组默认已固定`)
+    })()
+    // <<< LOCAL PATCH (manual lock)
 
     log(`[${VERSION}] Done! Groups: ${config['proxy-groups'].length}, Rules: ${config.rules.length}, Providers: ${Object.keys(config['rule-providers']).length}`)
     return config
