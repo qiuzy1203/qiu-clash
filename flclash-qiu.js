@@ -1734,22 +1734,8 @@ function main(config) {
     // 删除本块即恢复上游默认。
     ;(function () {
       var LOCK = ['🇭🇰 香港节点', '🇸🇬 狮城节点', '🇺🇸 美国节点', '🌎 美洲节点']
-      var BIZ_FIRST = {
-        '🤖 AI 服务': '🌏 其他节点',
-        '📱 社交媒体': '🇭🇰 香港节点',
-        '🏦 金融支付': '🇭🇰 香港节点',
-        '💰 加密货币': '🇭🇰 香港节点',
-        '🧑‍💼 会议协作': '🇭🇰 香港节点',
-        '🎥 Netflix': '🇺🇸 美国节点',
-        '🎬 Disney+': '🇺🇸 美国节点',
-        '📡 HBO/Max': '🇺🇸 美国节点',
-        '📺 Hulu': '🇺🇸 美国节点',
-        '🎬 Prime Video': '🇺🇸 美国节点',
-        '📥 下载更新': '🚀 自建节点',
-        '🛰️ BT/PT Tracker': '🚀 自建节点'
-      }
       var groups = config['proxy-groups'] || []
-      var i, j, k
+      var i, j
       function idxOf(name) {
         for (var n = 0; n < groups.length; n++) { if (groups[n] && groups[n].name === name) return n }
         return -1
@@ -1761,29 +1747,14 @@ function main(config) {
         g.type = 'select'
         delete g.url; delete g.interval; delete g.tolerance; delete g.lazy
       }
-      // 2) 自建节点单独成组（无限流量，下载/BT 走它，省机场配额）
-      var SELF_RE = /(trojan|vless|tuic|hysteria2)-USA/i
-      var selfNames = (config.proxies || []).map(function (p) { return p.name }).filter(function (n) { return SELF_RE.test(n) })
-      if (selfNames.length && idxOf('🚀 自建节点') === -1) {
-        var at = idxOf('🌍 全球节点')
-        var ng = { name: '🚀 自建节点', type: 'select', proxies: selfNames.slice() }
-        if (at >= 0) groups.splice(at + 1, 0, ng); else groups.push(ng)
-      }
-      // 3) hy2 从所有 url-test 池剔除：握手通但数据传不下来，会被测成“最快”导致整机断网
+      // 2) hy2 从所有 url-test 池剔除：握手通但数据传不下来，会被测成“最快”导致整机断网
       for (j = 0; j < groups.length; j++) {
         var u = groups[j]
         if (!u || u.type !== 'url-test' || !Array.isArray(u.proxies)) continue
         u.proxies = u.proxies.filter(function (n) { return !/hysteria2-USA/i.test(n) })
       }
-      // 4) 业务组默认成员（select 的默认 = 第一个成员）；目标组不在成员里就先插进去
-      for (k = 0; k < groups.length; k++) {
-        var b = groups[k]
-        if (!b || !BIZ_FIRST[b.name] || !Array.isArray(b.proxies)) continue
-        var want = BIZ_FIRST[b.name]
-        if (idxOf(want) === -1) continue
-        b.proxies = [want].concat(b.proxies.filter(function (n) { return n !== want }))
-      }
-      // 5) 「全球节点」改成地区组的选择器（成员是各组，不是 41 个裸节点）
+      // 4) 「全球节点」改成地区组的选择器（成员是各组，不是 41 个裸节点）
+      //    业务组保持上游默认成员，选哪个由你自己点，这里不做预设。
       var gi = idxOf('🌍 全球节点')
       if (gi !== -1) {
         var REGION = ['🇭🇰 香港节点', '🇹🇼 台湾节点', '🇸🇬 狮城节点', '🇯🇵 日韩节点', '🌏 亚太节点',
@@ -1796,7 +1767,7 @@ function main(config) {
           gg.proxies = members
         }
       }
-      log(`[${VERSION}] LOCAL PATCH manual-lock: ${LOCK.join(' / ')} -> select; 自建组=${selfNames.length}; 业务组默认已固定`)
+      log(`[${VERSION}] LOCAL PATCH manual-lock: ${LOCK.join(' / ')} -> select; 全球节点=地区组选择器`)
     })()
     // <<< LOCAL PATCH (manual lock)
 
