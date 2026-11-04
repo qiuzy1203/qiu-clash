@@ -1742,20 +1742,35 @@ function main(config) {
       'DOMAIN-SUFFIX,play-fe.googleapis.com,🔍 Google 服务',
       'DOMAIN-SUFFIX,play-lh.googleusercontent.com,🔍 Google 服务',
       // Google 应用包 CDN：gvt2/gvt3 原先命中「🛑 广告拦截」被 REJECT
+      // 依据：Zebra 企业防火墙白名单文档明确 gvt2.com / gvt3.com 用于
+      // 「Play 连接监控和诊断」，属 Google 基础设施（NS 均为 ns*.google.com），
+      // 非广告域名。上游规则集自相矛盾（gvt3.com 同时出现在 010-ad 与 031-google），
+      // 010-ad 排位更靠前导致 REJECT，Play 商店 APK 下载被拦。
       'DOMAIN-SUFFIX,gvt1.com,🔍 Google 服务',
       'DOMAIN-SUFFIX,gvt2.com,🔍 Google 服务',
       'DOMAIN-SUFFIX,gvt3.com,🔍 Google 服务',
+      'DOMAIN-SUFFIX,gvt0.com,🔍 Google 服务',
+      'DOMAIN-SUFFIX,gvt5.com,🔍 Google 服务',
+      'DOMAIN-SUFFIX,gvt6.com,🔍 Google 服务',
+      'DOMAIN-SUFFIX,gvt7.com,🔍 Google 服务',
+      'DOMAIN-SUFFIX,gvt9.com,🔍 Google 服务',
+      'DOMAIN-SUFFIX,gvt1-cn.com,🔍 Google 服务',
       'DOMAIN-SUFFIX,gvt2-cn.com,🔍 Google 服务',
+      // Google Play 重定向与遥测端点（原落「🏠 国内网站」/ 广告组）
+      'DOMAIN-SUFFIX,redirector.gvt1.com,🔍 Google 服务',
+      'DOMAIN-SUFFIX,redirector.gcpcdn.gvt1.com,🔍 Google 服务',
+      'DOMAIN-SUFFIX,beacons.gvt2.com,🔍 Google 服务',
+      'DOMAIN-SUFFIX,beacons.gcp.gvt2.com,🔍 Google 服务',
       // Google 基础服务
       'DOMAIN-SUFFIX,googleapis.com,🔍 Google 服务',
       'DOMAIN-SUFFIX,googleapis.cn,🔍 Google 服务',
       'DOMAIN-SUFFIX,googleusercontent.com,🔍 Google 服务',
       'DOMAIN-SUFFIX,gstatic.com,🔍 Google 服务',
       'DOMAIN-SUFFIX,google.cn,🔍 Google 服务',
-      'DOMAIN-SUFFIX,ggpht.cn,🔍 Google 服务',
-      'DOMAIN-SUFFIX,googlezip.net,🔍 Google 服务',
-      'DOMAIN-SUFFIX,googleadservices.com,🔍 Google 服务',
-      'DOMAIN-SUFFIX,googlesyndication.com,🔍 Google 服务'
+      'DOMAIN-SUFFIX,googlezip.net,🔍 Google 服务'
+      // 注意：以下三个是真正的广告域名，刻意不并入 Google 组，继续交给
+      // 「🛑 广告拦截」处理（上游 010-ad 收录，且无任何 Google 组认领）：
+      //   googleadservices.com / googlesyndication.com / ggpht.cn
     ]
     if (Array.isArray(config.rules)) {
       for (var gi = LOCAL_GOOGLE_RULES.length - 1; gi >= 0; gi--) {
