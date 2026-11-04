@@ -1720,6 +1720,49 @@ function main(config) {
       }
     }
     // <<< LOCAL PATCH (minimax global)
+    // >>> LOCAL PATCH (qiuh) : Google 系全部归到「🔍 Google 服务」
+    // 原因（实测 2026-11-04，生成后的 config.yaml + 上游可读规则集逐域名核对）：
+    //  1) gvt2.com / gvt3.com / gvt2-cn.com 命中 scki-fused-010-ad-domain，
+    //     而该规则集排在第 9 位（比所有 Google 规则靠前）→ 走「🛑 广告拦截」组，
+    //     该组首选成员是 REJECT → Play 商店的 APK 托管 CDN 被直接拒绝，
+    //     表现为应用下载/更新失败或卡住。
+    //  2) android.clients.google.com / dl.google.com / play.googleapis.com
+    //     命中 scki-fused-030-download-domain → 走「📥 下载更新」组，
+    //     与商店主站（play.google.com → 031-google → 🔍 Google 服务）分裂。
+    //  统一到「🔍 Google 服务」，放在 rules 最前保证先于广告规则匹配。
+    //  删除本块即恢复上游默认行为。
+    var LOCAL_GOOGLE_RULES = [
+      // Play 商店主链路 + APK 托管 CDN（原先被广告规则拦截）
+      'DOMAIN-SUFFIX,play.google.com,🔍 Google 服务',
+      'DOMAIN-SUFFIX,market.android.com,🔍 Google 服务',
+      'DOMAIN-SUFFIX,android.clients.google.com,🔍 Google 服务',
+      'DOMAIN-SUFFIX,dl.google.com,🔍 Google 服务',
+      'DOMAIN-SUFFIX,dl-ssl.google.com,🔍 Google 服务',
+      'DOMAIN-SUFFIX,play.googleapis.com,🔍 Google 服务',
+      'DOMAIN-SUFFIX,play-fe.googleapis.com,🔍 Google 服务',
+      'DOMAIN-SUFFIX,play-lh.googleusercontent.com,🔍 Google 服务',
+      // Google 应用包 CDN：gvt2/gvt3 原先命中「🛑 广告拦截」被 REJECT
+      'DOMAIN-SUFFIX,gvt1.com,🔍 Google 服务',
+      'DOMAIN-SUFFIX,gvt2.com,🔍 Google 服务',
+      'DOMAIN-SUFFIX,gvt3.com,🔍 Google 服务',
+      'DOMAIN-SUFFIX,gvt2-cn.com,🔍 Google 服务',
+      // Google 基础服务
+      'DOMAIN-SUFFIX,googleapis.com,🔍 Google 服务',
+      'DOMAIN-SUFFIX,googleapis.cn,🔍 Google 服务',
+      'DOMAIN-SUFFIX,googleusercontent.com,🔍 Google 服务',
+      'DOMAIN-SUFFIX,gstatic.com,🔍 Google 服务',
+      'DOMAIN-SUFFIX,google.cn,🔍 Google 服务',
+      'DOMAIN-SUFFIX,ggpht.cn,🔍 Google 服务',
+      'DOMAIN-SUFFIX,googlezip.net,🔍 Google 服务',
+      'DOMAIN-SUFFIX,googleadservices.com,🔍 Google 服务',
+      'DOMAIN-SUFFIX,googlesyndication.com,🔍 Google 服务'
+    ]
+    if (Array.isArray(config.rules)) {
+      for (var gi = LOCAL_GOOGLE_RULES.length - 1; gi >= 0; gi--) {
+        config.rules.unshift(LOCAL_GOOGLE_RULES[gi])
+      }
+    }
+    // <<< LOCAL PATCH (google service)
     // >>> LOCAL PATCH (qiuh) : 启用 IPv6
     // 脚本默认 config.ipv6=false / dns.ipv6=false，会屏蔽 AAAA 解析；
     // 家里已开通联通 IPv6（2408:8207:c5b:6ed0::/60），节点也有 IPv6 出口。
