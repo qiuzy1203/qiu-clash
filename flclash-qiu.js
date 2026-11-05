@@ -1703,7 +1703,7 @@ function main(config) {
         config.rules.unshift(LOCAL_DIRECT_RULES[li])
       }
     }
-    // <<< LOCAL PATCH
+    // <<< LOCAL PATCH (fanqie ugreen)
     // >>> LOCAL PATCH (qiuh) : MiniMax 国际版强制走代理
     // 原因：agent.minimax.io 在国际版账号下需要境外出口；直连时 307 跳转到
     // agent.minimaxi.com（国内站点），导致国际版令牌被判 invalid access token。
