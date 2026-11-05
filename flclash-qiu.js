@@ -1,5 +1,5 @@
 // FlClash 覆写脚本 — 标准 Mihomo 内核动态分流版
-// 版本：v6.0.21-flclash.25 (2026-10-29)
+// 版本：v6.0.21-flclash.26 (2026-10-31)
 // 架构：22 url-test 区域组（11 全部 + 11 家宽）+ 33 业务策略组 + 149 融合 rule-providers / 168 rules
 // 规则源：rulesets/source/routing-graph.js v6.0.21（规则等价；区域组为 url-test — FlClash 内核为标准 Mihomo，不支持 smart + LightGBM）
 // 适用：FlClash >= v0.8.85（覆盖脚本功能自该版本引入）；其他使用标准 Mihomo 内核的客户端
@@ -10,13 +10,17 @@
 // ⚠️ 必须先「创建」脚本再「关联」到订阅！
 //
 // 【第 1 步：创建覆写脚本】
-//   FlClash → 配置 →「覆写脚本」→ 右上角 + → 输入名称
-//   方式 A（URL）：填入 https://raw.githubusercontent.com/IvanSolis1989/Smart-Config-Kit/main/Mihomo%E5%86%85%E6%A0%B8%E7%B3%BB/FlClash/FlClash%28mihomo%29.js
-//   方式 B（粘贴）：打开上方 Raw 链接，全选复制粘贴；第一行必须是 `// FlClash 覆写脚本`
+//   v0.9.0 / v0.9.1：配置 → 对应配置菜单 →「扩展」→「脚本」→「前往配置脚本」→ 创建脚本。
+//   旧版覆写界面：配置 → 顶部「覆写脚本」→ + → 创建脚本。
+//   方式 A（通过URL导入）：填入 https://raw.githubusercontent.com/IvanSolis1989/Smart-Config-Kit/main/Mihomo%E5%86%85%E6%A0%B8%E7%B3%BB/FlClash/FlClash%28mihomo%29.js
+//   方式 B（从零开始）：清空默认内容，粘贴脚本全文并命名；第一行必须是 `// FlClash 覆写脚本`。
+//   已下载的 JS 也可「通过文件导入」；定制方案不要用官方 URL 同步覆盖。
 //   保存。
 //
 // 【第 2 步：关联到订阅】
-//   配置页 → 订阅卡片 ⋮ →「更多」→「覆写」→ 点选刚才创建的脚本 → 确定 → 下拉刷新。
+//   v0.9.0 / v0.9.1：对应配置 →「扩展」→ 选「脚本」模式 → 在「扩展脚本」中点选脚本。
+//   旧版覆写界面：订阅卡片 ⋮ →「更多」→「覆写」→ 选择脚本模式及脚本 → 确定。
+//   每份配置单独关联，重新应用配置；正在运行时停止后再启动。新旧界面图解见本目录 README.md。
 //
 // ⚠️ GitHub 无法直连时先确保代理已通，再用 Raw URL / 手动粘贴。
 //
@@ -34,7 +38,7 @@
 //  版本常量
 // ================================================================
 
-const VERSION = 'v6.0.21-flclash.25'
+const VERSION = 'v6.0.21-flclash.26'
 
 // 受信任的本地订阅适配模式：off | policy | adaptive | hosts-only。
 // 不从机场订阅读取；默认 adaptive 不变；hosts-only 仅显式导入活动节点精确 IP hosts。
@@ -46,6 +50,8 @@ const SCKI_MAX_NODE_MULTIPLIER = null
 const SCKI_HEALTH_CHECK_PROFILE = 'standard'
 const SCKI_QUIC_POLICY = 'block-foreign'
 const SCKI_ZEROTIER_PLANET_PROXY = false
+// Windows Chrome/Edge/Firefox only: explicit local opt-in rejects all browser UDP.
+const SCKI_BROWSER_UDP_POLICY = 'off'
 
 // >>> SCKI TRAFFIC OPTIONS: BEGIN — generated from tools/runtime/traffic-options.js, routing-graph.js and traffic-options.json.
 // Browser and QuickJS safe. Synchronize rule data from routing-graph.js with tools/sync-traffic-options.js.
@@ -59,12 +65,16 @@ var SckiTrafficOptions = (function() {
   // >>> SCKI ZEROTIER PLANET: BEGIN
   var ZEROTIER_PLANET_PROXY_POLICY = {"targetGroup":"🇺🇸 美国节点","rules":["AND,((NETWORK,UDP),(DST-PORT,9993),(IP-CIDR,103.195.103.66/32,no-resolve)),🇺🇸 美国节点","AND,((NETWORK,UDP),(DST-PORT,9993),(IP-CIDR,79.127.159.187/32,no-resolve)),🇺🇸 美国节点","AND,((NETWORK,UDP),(DST-PORT,9993),(IP-CIDR,84.17.53.155/32,no-resolve)),🇺🇸 美国节点","AND,((NETWORK,UDP),(DST-PORT,9993),(IP-CIDR,185.152.67.145/32,no-resolve)),🇺🇸 美国节点"]};
   // <<< SCKI ZEROTIER PLANET: END
+  // >>> SCKI BROWSER UDP: BEGIN
+  var BROWSER_UDP_PRIVACY_POLICY = {"processNames":["chrome.exe","msedge.exe","firefox.exe"],"rules":["AND,((NETWORK,UDP),(PROCESS-NAME,chrome.exe)),REJECT","AND,((NETWORK,UDP),(PROCESS-NAME,msedge.exe)),REJECT","AND,((NETWORK,UDP),(PROCESS-NAME,firefox.exe)),REJECT"]};
+  // <<< SCKI BROWSER UDP: END
 
   function validate(options) {
     if (!options || Object.prototype.toString.call(options) !== '[object Object]' ||
         (options.healthCheckProfile !== 'standard' && options.healthCheckProfile !== 'power-save') ||
         (options.quicPolicy !== 'block-foreign' && options.quicPolicy !== 'follow-rules') ||
-        (options.zeroTierPlanetProxy !== undefined && typeof options.zeroTierPlanetProxy !== 'boolean')) {
+        (options.zeroTierPlanetProxy !== undefined && typeof options.zeroTierPlanetProxy !== 'boolean') ||
+        (Object.prototype.hasOwnProperty.call(options, 'browserUdpPolicy') && options.browserUdpPolicy !== 'off' && options.browserUdpPolicy !== 'reject')) {
       throw new Error('Invalid SCKI traffic options');
     }
     return options;
@@ -120,7 +130,22 @@ var SckiTrafficOptions = (function() {
     return rules;
   }
 
-  return { validate: validate, applyHealthCheckProfile: applyHealthCheckProfile, applyQuicPolicy: applyQuicPolicy, requireZeroTierPlanetProxyTarget: requireZeroTierPlanetProxyTarget, applyZeroTierPlanetProxy: applyZeroTierPlanetProxy };
+  function applyBrowserUdpPolicy(rules, mode) {
+    if (mode !== 'off' && mode !== 'reject') throw new Error('Invalid SCKI browser UDP policy');
+    if (!Array.isArray(rules)) throw new Error('SCKI rules must be an array');
+    var ownedRules = BROWSER_UDP_PRIVACY_POLICY.rules;
+    for (var i = rules.length - 1; i >= 0; i--) {
+      if (ownedRules.indexOf(rules[i]) >= 0) rules.splice(i, 1);
+    }
+    if (mode === 'reject') {
+      // Explicit local safety choice overrides all routing, including DIRECT
+      // policy groups, QUIC service exceptions and local ZeroTier routing.
+      for (var j = ownedRules.length - 1; j >= 0; j--) rules.unshift(ownedRules[j]);
+    }
+    return rules;
+  }
+
+  return { validate: validate, applyHealthCheckProfile: applyHealthCheckProfile, applyQuicPolicy: applyQuicPolicy, requireZeroTierPlanetProxyTarget: requireZeroTierPlanetProxyTarget, applyZeroTierPlanetProxy: applyZeroTierPlanetProxy, applyBrowserUdpPolicy: applyBrowserUdpPolicy };
 })();
 
 if (typeof module !== 'undefined' && module.exports) module.exports = SckiTrafficOptions;
@@ -1604,7 +1629,7 @@ function sortProxyGroups(config) {
 function main(config) {
   try {
     if (!config || typeof config !== 'object') return config
-    SckiTrafficOptions.validate({ healthCheckProfile: SCKI_HEALTH_CHECK_PROFILE, quicPolicy: SCKI_QUIC_POLICY, zeroTierPlanetProxy: SCKI_ZEROTIER_PLANET_PROXY })
+    SckiTrafficOptions.validate({ healthCheckProfile: SCKI_HEALTH_CHECK_PROFILE, quicPolicy: SCKI_QUIC_POLICY, zeroTierPlanetProxy: SCKI_ZEROTIER_PLANET_PROXY, browserUdpPolicy: SCKI_BROWSER_UDP_POLICY })
     var nodePlan = SckiSubscriptionNodeFilter.preflight(config, Object.values(SMART).concat(Object.values(BIZ)), SCKI_MAX_NODE_MULTIPLIER)
     if (!nodePlan.ok) {
       log(`[${VERSION}] Node preflight rejected: ${nodePlan.reason}${nodePlan.reason === 'provider-input' ? '; flatten in SubStore for provider subscriptions' : ''}`)
@@ -1675,181 +1700,181 @@ function main(config) {
     SckiTrafficOptions.applyHealthCheckProfile(config, SCKI_HEALTH_CHECK_PROFILE, 'normal')
     SckiTrafficOptions.applyQuicPolicy(config.rules, SCKI_QUIC_POLICY)
     SckiTrafficOptions.applyZeroTierPlanetProxy(config.rules, SCKI_ZEROTIER_PLANET_PROXY, config['proxy-groups'].map(function(group) { return group.name }))
+    SckiTrafficOptions.applyBrowserUdpPolicy(config.rules, SCKI_BROWSER_UDP_POLICY)
     sortProxyGroups(config)
-    // >>> LOCAL PATCH (qiuh) : 番茄小说 / 字节系域名强制直连
-    // 原因：scki-fused-010-ad-domain 规则集含 "+.byteimg.com"、"vcs.zijieapi.com"、
-    // "+.mcs.zijieapi.com"、"lf-headquarters-speed.yhgfb-cn-static.com"，
-    // 被「🛑 广告拦截」组默认 REJECT，导致番茄登录风控 SDK 与全站图片加载失败。
-    // 放在 rules 最前，保证先于广告规则匹配。删除本块即恢复原行为。
-    var LOCAL_DIRECT_RULES = [
-      'DOMAIN-SUFFIX,fanqienovel.com,DIRECT',
-      'DOMAIN-SUFFIX,fqnovel.com,DIRECT',
-      'DOMAIN-SUFFIX,byteimg.com,DIRECT',
-      'DOMAIN-SUFFIX,zijieapi.com,DIRECT',
-      'DOMAIN-SUFFIX,yhgfb-cn-static.com,DIRECT',
-      'DOMAIN-SUFFIX,bytegoofy.com,DIRECT',
-      'DOMAIN-SUFFIX,bytetos.com,DIRECT',
-      'DOMAIN-SUFFIX,snssdk.com,DIRECT',
-      'DOMAIN-SUFFIX,bytedance.com,DIRECT',
-      // 绿联 NAS 远程访问 / 相册备份：走直连，避免被代理绕出国导致 P2P 打洞失败、备份龟速
-      'DOMAIN-SUFFIX,ugreen.com,DIRECT',
-      'DOMAIN-SUFFIX,ugnas.com,DIRECT',
-      'DOMAIN-SUFFIX,ugnas.cloud,DIRECT',
-      'DOMAIN-SUFFIX,ug.link,DIRECT'
-    ]
-    if (Array.isArray(config.rules)) {
-      // 原地插入（QuickJS FFI 桥接层限制：不能给 config.rules 重新赋值）
-      for (var li = LOCAL_DIRECT_RULES.length - 1; li >= 0; li--) {
-        config.rules.unshift(LOCAL_DIRECT_RULES[li])
-      }
+// >>> LOCAL PATCH (qiuh) : 番茄小说 / 字节系域名强制直连
+// 原因：scki-fused-010-ad-domain 规则集含 "+.byteimg.com"、"vcs.zijieapi.com"、
+// "+.mcs.zijieapi.com"、"lf-headquarters-speed.yhgfb-cn-static.com"，
+// 被「🛑 广告拦截」组默认 REJECT，导致番茄登录风控 SDK 与全站图片加载失败。
+// 放在 rules 最前，保证先于广告规则匹配。删除本块即恢复原行为。
+var LOCAL_DIRECT_RULES = [
+  'DOMAIN-SUFFIX,fanqienovel.com,DIRECT',
+  'DOMAIN-SUFFIX,fqnovel.com,DIRECT',
+  'DOMAIN-SUFFIX,byteimg.com,DIRECT',
+  'DOMAIN-SUFFIX,zijieapi.com,DIRECT',
+  'DOMAIN-SUFFIX,yhgfb-cn-static.com,DIRECT',
+  'DOMAIN-SUFFIX,bytegoofy.com,DIRECT',
+  'DOMAIN-SUFFIX,bytetos.com,DIRECT',
+  'DOMAIN-SUFFIX,snssdk.com,DIRECT',
+  'DOMAIN-SUFFIX,bytedance.com,DIRECT',
+  // 绿联 NAS 远程访问 / 相册备份：走直连，避免被代理绕出国导致 P2P 打洞失败、备份龟速
+  'DOMAIN-SUFFIX,ugreen.com,DIRECT',
+  'DOMAIN-SUFFIX,ugnas.com,DIRECT',
+  'DOMAIN-SUFFIX,ugnas.cloud,DIRECT',
+  'DOMAIN-SUFFIX,ug.link,DIRECT'
+]
+if (Array.isArray(config.rules)) {
+  // 原地插入（QuickJS FFI 桥接层限制：不能给 config.rules 重新赋值）
+  for (var li = LOCAL_DIRECT_RULES.length - 1; li >= 0; li--) {
+    config.rules.unshift(LOCAL_DIRECT_RULES[li])
+  }
+}
+// <<< LOCAL PATCH (fanqie ugreen)
+// >>> LOCAL PATCH (qiuh) : MiniMax 国际版强制走代理
+// 原因：agent.minimax.io 在国际版账号下需要境外出口；直连时 307 跳转到
+// agent.minimaxi.com（国内站点），导致国际版令牌被判 invalid access token。
+// 放在 rules 最前，保证先于 DIRECT 类规则匹配。删除本块即恢复原行为。
+var LOCAL_PROXY_RULES = [
+  'DOMAIN-SUFFIX,minimax.io,🤖 AI 服务'
+]
+if (Array.isArray(config.rules)) {
+  for (var pi = LOCAL_PROXY_RULES.length - 1; pi >= 0; pi--) {
+    config.rules.unshift(LOCAL_PROXY_RULES[pi])
+  }
+}
+// <<< LOCAL PATCH (minimax global)
+// >>> LOCAL PATCH (qiuh) : Meta / Muse 显式锁美国出口
+// 原因（2026-11-05，按 Clash 真实匹配语义对生成后的 config.yaml 逐域名算过）：
+//  ai.meta.com / www.meta.com 命中 042-social 的 DOMAIN-SUFFIX,meta.com →「📱 社交媒体」；
+//  meta.ai（原在 MiniMax 块里）与 muse.ai（033-ai-domain）→「🤖 AI 服务」。
+//  这两个业务组的首选成员都是「🌍 全球节点」，而全球节点是 select、首成员是「🇭🇰 香港节点」，
+//  所以 Meta 流量默认从香港出口 —— 美国节点从没被用上，Muse 的开放地区不含香港。
+//  另外 graph.facebook.com 命中 010-ad 的 DOMAIN,graph.facebook.com →「🛑 广告拦截」REJECT，
+//  Facebook SDK 登录会直接失败。
+// 这里只把 Meta / Muse 相关域名钉到「🇺🇸 美国节点」（区域组，组内具体节点由用户在客户端选），
+// 不动业务组的默认成员。删除本块即恢复原行为。
+var LOCAL_META_RULES = [
+  'DOMAIN-SUFFIX,meta.com,🇺🇸 美国节点',
+  'DOMAIN-SUFFIX,meta.ai,🇺🇸 美国节点',
+  'DOMAIN-SUFFIX,muse.ai,🇺🇸 美国节点',
+  'DOMAIN-SUFFIX,fbcdn.net,🇺🇸 美国节点',
+  'DOMAIN,graph.facebook.com,🇺🇸 美国节点',
+  'DOMAIN-SUFFIX,connect.facebook.net,🇺🇸 美国节点'
+]
+if (Array.isArray(config.rules)) {
+  for (var mi = LOCAL_META_RULES.length - 1; mi >= 0; mi--) {
+    config.rules.unshift(LOCAL_META_RULES[mi])
+  }
+}
+// <<< LOCAL PATCH (meta us)
+// >>> LOCAL PATCH (qiuh) : Google 系全部归到「🔍 Google 服务」
+// 原因（实测 2026-11-04，生成后的 config.yaml + 上游可读规则集逐域名核对）：
+//  1) gvt2.com / gvt3.com / gvt2-cn.com 命中 scki-fused-010-ad-domain，
+//     而该规则集排在第 9 位（比所有 Google 规则靠前）→ 走「🛑 广告拦截」组，
+//     该组首选成员是 REJECT → Play 商店的 APK 托管 CDN 被直接拒绝，
+//     表现为应用下载/更新失败或卡住。
+//  2) android.clients.google.com / dl.google.com / play.googleapis.com
+//     命中 scki-fused-030-download-domain → 走「📥 下载更新」组，
+//     与商店主站（play.google.com → 031-google → 🔍 Google 服务）分裂。
+//  统一到「🔍 Google 服务」，放在 rules 最前保证先于广告规则匹配。
+//  删除本块即恢复上游默认行为。
+var LOCAL_GOOGLE_RULES = [
+  // Play 商店主链路 + APK 托管 CDN（原先被广告规则拦截）
+  'DOMAIN-SUFFIX,play.google.com,🔍 Google 服务',
+  'DOMAIN-SUFFIX,market.android.com,🔍 Google 服务',
+  'DOMAIN-SUFFIX,android.clients.google.com,🔍 Google 服务',
+  'DOMAIN-SUFFIX,dl.google.com,🔍 Google 服务',
+  'DOMAIN-SUFFIX,dl-ssl.google.com,🔍 Google 服务',
+  'DOMAIN-SUFFIX,play.googleapis.com,🔍 Google 服务',
+  'DOMAIN-SUFFIX,play-fe.googleapis.com,🔍 Google 服务',
+  'DOMAIN-SUFFIX,play-lh.googleusercontent.com,🔍 Google 服务',
+  // Google 应用包 CDN：gvt2/gvt3 原先命中「🛑 广告拦截」被 REJECT
+  // 依据：Zebra 企业防火墙白名单文档明确 gvt2.com / gvt3.com 用于
+  // 「Play 连接监控和诊断」，属 Google 基础设施（NS 均为 ns*.google.com），
+  // 非广告域名。上游规则集自相矛盾（gvt3.com 同时出现在 010-ad 与 031-google），
+  // 010-ad 排位更靠前导致 REJECT，Play 商店 APK 下载被拦。
+  'DOMAIN-SUFFIX,gvt1.com,🔍 Google 服务',
+  'DOMAIN-SUFFIX,gvt2.com,🔍 Google 服务',
+  'DOMAIN-SUFFIX,gvt3.com,🔍 Google 服务',
+  'DOMAIN-SUFFIX,gvt0.com,🔍 Google 服务',
+  'DOMAIN-SUFFIX,gvt5.com,🔍 Google 服务',
+  'DOMAIN-SUFFIX,gvt6.com,🔍 Google 服务',
+  'DOMAIN-SUFFIX,gvt7.com,🔍 Google 服务',
+  'DOMAIN-SUFFIX,gvt9.com,🔍 Google 服务',
+  'DOMAIN-SUFFIX,gvt1-cn.com,🔍 Google 服务',
+  'DOMAIN-SUFFIX,gvt2-cn.com,🔍 Google 服务',
+  // Google Play 重定向与遥测端点（原落「🏠 国内网站」/ 广告组）
+  'DOMAIN-SUFFIX,redirector.gvt1.com,🔍 Google 服务',
+  'DOMAIN-SUFFIX,redirector.gcpcdn.gvt1.com,🔍 Google 服务',
+  'DOMAIN-SUFFIX,beacons.gvt2.com,🔍 Google 服务',
+  'DOMAIN-SUFFIX,beacons.gcp.gvt2.com,🔍 Google 服务',
+  // Google 基础服务
+  'DOMAIN-SUFFIX,googleapis.com,🔍 Google 服务',
+  'DOMAIN-SUFFIX,googleapis.cn,🔍 Google 服务',
+  'DOMAIN-SUFFIX,googleusercontent.com,🔍 Google 服务',
+  'DOMAIN-SUFFIX,gstatic.com,🔍 Google 服务',
+  'DOMAIN-SUFFIX,google.cn,🔍 Google 服务',
+  'DOMAIN-SUFFIX,googlezip.net,🔍 Google 服务'
+  // 注意：以下三个是真正的广告域名，刻意不并入 Google 组，继续交给
+  // 「🛑 广告拦截」处理（上游 010-ad 收录，且无任何 Google 组认领）：
+  //   googleadservices.com / googlesyndication.com / ggpht.cn
+]
+if (Array.isArray(config.rules)) {
+  for (var gi = LOCAL_GOOGLE_RULES.length - 1; gi >= 0; gi--) {
+    config.rules.unshift(LOCAL_GOOGLE_RULES[gi])
+  }
+}
+// <<< LOCAL PATCH (google service)
+// >>> LOCAL PATCH (qiuh) : 启用 IPv6
+// 脚本默认 config.ipv6=false / dns.ipv6=false，会屏蔽 AAAA 解析；
+// 家里已开通联通 IPv6（2408:8207:c5b:6ed0::/60），节点也有 IPv6 出口。
+// 删除本块即恢复作者默认（关闭）。
+config.ipv6 = true
+if (!config.dns) config.dns = {}
+config.dns.ipv6 = true
+// <<< LOCAL PATCH (ipv6)
+// >>> LOCAL PATCH (qiuh) : 手动锁定组 + 业务组默认成员
+// url-test 每 300 秒按延迟自动换节点：账号/支付/流媒体对出口 IP 敏感，会触发风控或掉解锁；
+// 而「美国/美洲」池里混着自建 4 条（无限流量），自动择优会一直挑机场，白吃配额。
+// 删除本块即恢复上游默认。
+;(function () {
+  var LOCK = ['🇭🇰 香港节点', '🇸🇬 狮城节点', '🇺🇸 美国节点', '🌎 美洲节点']
+  var groups = config['proxy-groups'] || []
+  var i, j
+  function idxOf(name) {
+    for (var n = 0; n < groups.length; n++) { if (groups[n] && groups[n].name === name) return n }
+    return -1
+  }
+  // 1) 指定区域组改成 select（手动锁定，不再自动切换）
+  for (i = 0; i < groups.length; i++) {
+    var g = groups[i]
+    if (!g || LOCK.indexOf(g.name) === -1) continue
+    g.type = 'select'
+    delete g.url; delete g.interval; delete g.tolerance; delete g.lazy
+  }
+  // 2) hy2 从所有 url-test 池剔除：握手通但数据传不下来，会被测成“最快”导致整机断网
+  for (j = 0; j < groups.length; j++) {
+    var u = groups[j]
+    if (!u || u.type !== 'url-test' || !Array.isArray(u.proxies)) continue
+    u.proxies = u.proxies.filter(function (n) { return !/hysteria2-USA/i.test(n) })
+  }
+  // 4) 「全球节点」改成地区组的选择器（成员是各组，不是 41 个裸节点）
+  //    业务组保持上游默认成员，选哪个由你自己点，这里不做预设。
+  var gi = idxOf('🌍 全球节点')
+  if (gi !== -1) {
+    var REGION = ['🇭🇰 香港节点', '🇹🇼 台湾节点', '🇸🇬 狮城节点', '🇯🇵 日韩节点', '🌏 亚太节点',
+                  '🇺🇸 美国节点', '🇪🇺 欧洲节点', '🌎 美洲节点', '🌏 其他节点', '🚀 自建节点']
+    var members = REGION.filter(function (n) { return idxOf(n) !== -1 })
+    if (members.length) {
+      var gg = groups[gi]
+      gg.type = 'select'
+      delete gg.url; delete gg.interval; delete gg.tolerance; delete gg.lazy
+      gg.proxies = members
     }
-    // <<< LOCAL PATCH (fanqie ugreen)
-    // >>> LOCAL PATCH (qiuh) : MiniMax 国际版强制走代理
-    // 原因：agent.minimax.io 在国际版账号下需要境外出口；直连时 307 跳转到
-    // agent.minimaxi.com（国内站点），导致国际版令牌被判 invalid access token。
-    // 放在 rules 最前，保证先于 DIRECT 类规则匹配。删除本块即恢复原行为。
-    var LOCAL_PROXY_RULES = [
-      'DOMAIN-SUFFIX,minimax.io,🤖 AI 服务'
-    ]
-    if (Array.isArray(config.rules)) {
-      for (var pi = LOCAL_PROXY_RULES.length - 1; pi >= 0; pi--) {
-        config.rules.unshift(LOCAL_PROXY_RULES[pi])
-      }
-    }
-    // <<< LOCAL PATCH (minimax global)
-    // >>> LOCAL PATCH (qiuh) : Meta / Muse 显式锁美国出口
-    // 原因（2026-11-05，按 Clash 真实匹配语义对生成后的 config.yaml 逐域名算过）：
-    //  ai.meta.com / www.meta.com 命中 042-social 的 DOMAIN-SUFFIX,meta.com →「📱 社交媒体」；
-    //  meta.ai（原在 MiniMax 块里）与 muse.ai（033-ai-domain）→「🤖 AI 服务」。
-    //  这两个业务组的首选成员都是「🌍 全球节点」，而全球节点是 select、首成员是「🇭🇰 香港节点」，
-    //  所以 Meta 流量默认从香港出口 —— 美国节点从没被用上，Muse 的开放地区不含香港。
-    //  另外 graph.facebook.com 命中 010-ad 的 DOMAIN,graph.facebook.com →「🛑 广告拦截」REJECT，
-    //  Facebook SDK 登录会直接失败。
-    // 这里只把 Meta / Muse 相关域名钉到「🇺🇸 美国节点」（区域组，组内具体节点由用户在客户端选），
-    // 不动业务组的默认成员。删除本块即恢复原行为。
-    var LOCAL_META_RULES = [
-      'DOMAIN-SUFFIX,meta.com,🇺🇸 美国节点',
-      'DOMAIN-SUFFIX,meta.ai,🇺🇸 美国节点',
-      'DOMAIN-SUFFIX,muse.ai,🇺🇸 美国节点',
-      'DOMAIN-SUFFIX,fbcdn.net,🇺🇸 美国节点',
-      'DOMAIN,graph.facebook.com,🇺🇸 美国节点',
-      'DOMAIN-SUFFIX,connect.facebook.net,🇺🇸 美国节点'
-    ]
-    if (Array.isArray(config.rules)) {
-      for (var mi = LOCAL_META_RULES.length - 1; mi >= 0; mi--) {
-        config.rules.unshift(LOCAL_META_RULES[mi])
-      }
-    }
-    // <<< LOCAL PATCH (meta us)
-    // >>> LOCAL PATCH (qiuh) : Google 系全部归到「🔍 Google 服务」
-    // 原因（实测 2026-11-04，生成后的 config.yaml + 上游可读规则集逐域名核对）：
-    //  1) gvt2.com / gvt3.com / gvt2-cn.com 命中 scki-fused-010-ad-domain，
-    //     而该规则集排在第 9 位（比所有 Google 规则靠前）→ 走「🛑 广告拦截」组，
-    //     该组首选成员是 REJECT → Play 商店的 APK 托管 CDN 被直接拒绝，
-    //     表现为应用下载/更新失败或卡住。
-    //  2) android.clients.google.com / dl.google.com / play.googleapis.com
-    //     命中 scki-fused-030-download-domain → 走「📥 下载更新」组，
-    //     与商店主站（play.google.com → 031-google → 🔍 Google 服务）分裂。
-    //  统一到「🔍 Google 服务」，放在 rules 最前保证先于广告规则匹配。
-    //  删除本块即恢复上游默认行为。
-    var LOCAL_GOOGLE_RULES = [
-      // Play 商店主链路 + APK 托管 CDN（原先被广告规则拦截）
-      'DOMAIN-SUFFIX,play.google.com,🔍 Google 服务',
-      'DOMAIN-SUFFIX,market.android.com,🔍 Google 服务',
-      'DOMAIN-SUFFIX,android.clients.google.com,🔍 Google 服务',
-      'DOMAIN-SUFFIX,dl.google.com,🔍 Google 服务',
-      'DOMAIN-SUFFIX,dl-ssl.google.com,🔍 Google 服务',
-      'DOMAIN-SUFFIX,play.googleapis.com,🔍 Google 服务',
-      'DOMAIN-SUFFIX,play-fe.googleapis.com,🔍 Google 服务',
-      'DOMAIN-SUFFIX,play-lh.googleusercontent.com,🔍 Google 服务',
-      // Google 应用包 CDN：gvt2/gvt3 原先命中「🛑 广告拦截」被 REJECT
-      // 依据：Zebra 企业防火墙白名单文档明确 gvt2.com / gvt3.com 用于
-      // 「Play 连接监控和诊断」，属 Google 基础设施（NS 均为 ns*.google.com），
-      // 非广告域名。上游规则集自相矛盾（gvt3.com 同时出现在 010-ad 与 031-google），
-      // 010-ad 排位更靠前导致 REJECT，Play 商店 APK 下载被拦。
-      'DOMAIN-SUFFIX,gvt1.com,🔍 Google 服务',
-      'DOMAIN-SUFFIX,gvt2.com,🔍 Google 服务',
-      'DOMAIN-SUFFIX,gvt3.com,🔍 Google 服务',
-      'DOMAIN-SUFFIX,gvt0.com,🔍 Google 服务',
-      'DOMAIN-SUFFIX,gvt5.com,🔍 Google 服务',
-      'DOMAIN-SUFFIX,gvt6.com,🔍 Google 服务',
-      'DOMAIN-SUFFIX,gvt7.com,🔍 Google 服务',
-      'DOMAIN-SUFFIX,gvt9.com,🔍 Google 服务',
-      'DOMAIN-SUFFIX,gvt1-cn.com,🔍 Google 服务',
-      'DOMAIN-SUFFIX,gvt2-cn.com,🔍 Google 服务',
-      // Google Play 重定向与遥测端点（原落「🏠 国内网站」/ 广告组）
-      'DOMAIN-SUFFIX,redirector.gvt1.com,🔍 Google 服务',
-      'DOMAIN-SUFFIX,redirector.gcpcdn.gvt1.com,🔍 Google 服务',
-      'DOMAIN-SUFFIX,beacons.gvt2.com,🔍 Google 服务',
-      'DOMAIN-SUFFIX,beacons.gcp.gvt2.com,🔍 Google 服务',
-      // Google 基础服务
-      'DOMAIN-SUFFIX,googleapis.com,🔍 Google 服务',
-      'DOMAIN-SUFFIX,googleapis.cn,🔍 Google 服务',
-      'DOMAIN-SUFFIX,googleusercontent.com,🔍 Google 服务',
-      'DOMAIN-SUFFIX,gstatic.com,🔍 Google 服务',
-      'DOMAIN-SUFFIX,google.cn,🔍 Google 服务',
-      'DOMAIN-SUFFIX,googlezip.net,🔍 Google 服务'
-      // 注意：以下三个是真正的广告域名，刻意不并入 Google 组，继续交给
-      // 「🛑 广告拦截」处理（上游 010-ad 收录，且无任何 Google 组认领）：
-      //   googleadservices.com / googlesyndication.com / ggpht.cn
-    ]
-    if (Array.isArray(config.rules)) {
-      for (var gi = LOCAL_GOOGLE_RULES.length - 1; gi >= 0; gi--) {
-        config.rules.unshift(LOCAL_GOOGLE_RULES[gi])
-      }
-    }
-    // <<< LOCAL PATCH (google service)
-    // >>> LOCAL PATCH (qiuh) : 启用 IPv6
-    // 脚本默认 config.ipv6=false / dns.ipv6=false，会屏蔽 AAAA 解析；
-    // 家里已开通联通 IPv6（2408:8207:c5b:6ed0::/60），节点也有 IPv6 出口。
-    // 删除本块即恢复作者默认（关闭）。
-    config.ipv6 = true
-    if (!config.dns) config.dns = {}
-    config.dns.ipv6 = true
-    // <<< LOCAL PATCH (ipv6)
-    // >>> LOCAL PATCH (qiuh) : 手动锁定组 + 业务组默认成员
-    // url-test 每 300 秒按延迟自动换节点：账号/支付/流媒体对出口 IP 敏感，会触发风控或掉解锁；
-    // 而「美国/美洲」池里混着自建 4 条（无限流量），自动择优会一直挑机场，白吃配额。
-    // 删除本块即恢复上游默认。
-    ;(function () {
-      var LOCK = ['🇭🇰 香港节点', '🇸🇬 狮城节点', '🇺🇸 美国节点', '🌎 美洲节点']
-      var groups = config['proxy-groups'] || []
-      var i, j
-      function idxOf(name) {
-        for (var n = 0; n < groups.length; n++) { if (groups[n] && groups[n].name === name) return n }
-        return -1
-      }
-      // 1) 指定区域组改成 select（手动锁定，不再自动切换）
-      for (i = 0; i < groups.length; i++) {
-        var g = groups[i]
-        if (!g || LOCK.indexOf(g.name) === -1) continue
-        g.type = 'select'
-        delete g.url; delete g.interval; delete g.tolerance; delete g.lazy
-      }
-      // 2) hy2 从所有 url-test 池剔除：握手通但数据传不下来，会被测成“最快”导致整机断网
-      for (j = 0; j < groups.length; j++) {
-        var u = groups[j]
-        if (!u || u.type !== 'url-test' || !Array.isArray(u.proxies)) continue
-        u.proxies = u.proxies.filter(function (n) { return !/hysteria2-USA/i.test(n) })
-      }
-      // 4) 「全球节点」改成地区组的选择器（成员是各组，不是 41 个裸节点）
-      //    业务组保持上游默认成员，选哪个由你自己点，这里不做预设。
-      var gi = idxOf('🌍 全球节点')
-      if (gi !== -1) {
-        var REGION = ['🇭🇰 香港节点', '🇹🇼 台湾节点', '🇸🇬 狮城节点', '🇯🇵 日韩节点', '🌏 亚太节点',
-                      '🇺🇸 美国节点', '🇪🇺 欧洲节点', '🌎 美洲节点', '🌏 其他节点', '🚀 自建节点']
-        var members = REGION.filter(function (n) { return idxOf(n) !== -1 })
-        if (members.length) {
-          var gg = groups[gi]
-          gg.type = 'select'
-          delete gg.url; delete gg.interval; delete gg.tolerance; delete gg.lazy
-          gg.proxies = members
-        }
-      }
-      log(`[${VERSION}] LOCAL PATCH manual-lock: ${LOCK.join(' / ')} -> select; 全球节点=地区组选择器`)
-    })()
-    // <<< LOCAL PATCH (manual lock)
-
+  }
+  log(`[${VERSION}] LOCAL PATCH manual-lock: ${LOCK.join(' / ')} -> select; 全球节点=地区组选择器`)
+})()
+// <<< LOCAL PATCH (manual lock)
     log(`[${VERSION}] Done! Groups: ${config['proxy-groups'].length}, Rules: ${config.rules.length}, Providers: ${Object.keys(config['rule-providers']).length}`)
     return config
   } catch (e) {
