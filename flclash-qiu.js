@@ -1703,6 +1703,9 @@ function main(config) {
     SckiTrafficOptions.applyBrowserUdpPolicy(config.rules, SCKI_BROWSER_UDP_POLICY)
     sortProxyGroups(config)
 // >>> LOCAL PATCH (qiuh) : 番茄小说 / 字节系域名强制直连
+// 适用设备：Windows 电脑 / 三星安卓手机（FlClash）。
+//   iPhone 不吃这份脚本，用 Surge 配置 F:\HermesAgent\01-网络配置\Surge\QiuH.conf；
+//   Apple TV 用同目录 Qiuyh.conf。改分流时两处都要看，别只改一边。
 // 原因：scki-fused-010-ad-domain 规则集含 "+.byteimg.com"、"vcs.zijieapi.com"、
 // "+.mcs.zijieapi.com"、"lf-headquarters-speed.yhgfb-cn-static.com"，
 // 被「🛑 广告拦截」组默认 REJECT，导致番茄登录风控 SDK 与全站图片加载失败。
