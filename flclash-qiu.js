@@ -1709,10 +1709,7 @@ function main(config) {
     // agent.minimaxi.com（国内站点），导致国际版令牌被判 invalid access token。
     // 放在 rules 最前，保证先于 DIRECT 类规则匹配。删除本块即恢复原行为。
     var LOCAL_PROXY_RULES = [
-      'DOMAIN-SUFFIX,minimax.io,🤖 AI 服务',
-      // Meta AI（Muse）：ai.meta.com 由 042-social 命中走「📱 社交媒体」，
-      // 但 meta.ai 不在那个规则集里，会掉到「国外网站」。统一并到 AI 服务组。
-      'DOMAIN-SUFFIX,meta.ai,🤖 AI 服务'
+      'DOMAIN-SUFFIX,minimax.io,🤖 AI 服务'
     ]
     if (Array.isArray(config.rules)) {
       for (var pi = LOCAL_PROXY_RULES.length - 1; pi >= 0; pi--) {
@@ -1720,6 +1717,30 @@ function main(config) {
       }
     }
     // <<< LOCAL PATCH (minimax global)
+    // >>> LOCAL PATCH (qiuh) : Meta / Muse 显式锁美国出口
+    // 原因（2026-11-05，按 Clash 真实匹配语义对生成后的 config.yaml 逐域名算过）：
+    //  ai.meta.com / www.meta.com 命中 042-social 的 DOMAIN-SUFFIX,meta.com →「📱 社交媒体」；
+    //  meta.ai（原在 MiniMax 块里）与 muse.ai（033-ai-domain）→「🤖 AI 服务」。
+    //  这两个业务组的首选成员都是「🌍 全球节点」，而全球节点是 select、首成员是「🇭🇰 香港节点」，
+    //  所以 Meta 流量默认从香港出口 —— 美国节点从没被用上，Muse 的开放地区不含香港。
+    //  另外 graph.facebook.com 命中 010-ad 的 DOMAIN,graph.facebook.com →「🛑 广告拦截」REJECT，
+    //  Facebook SDK 登录会直接失败。
+    // 这里只把 Meta / Muse 相关域名钉到「🇺🇸 美国节点」（区域组，组内具体节点由用户在客户端选），
+    // 不动业务组的默认成员。删除本块即恢复原行为。
+    var LOCAL_META_RULES = [
+      'DOMAIN-SUFFIX,meta.com,🇺🇸 美国节点',
+      'DOMAIN-SUFFIX,meta.ai,🇺🇸 美国节点',
+      'DOMAIN-SUFFIX,muse.ai,🇺🇸 美国节点',
+      'DOMAIN-SUFFIX,fbcdn.net,🇺🇸 美国节点',
+      'DOMAIN,graph.facebook.com,🇺🇸 美国节点',
+      'DOMAIN-SUFFIX,connect.facebook.net,🇺🇸 美国节点'
+    ]
+    if (Array.isArray(config.rules)) {
+      for (var mi = LOCAL_META_RULES.length - 1; mi >= 0; mi--) {
+        config.rules.unshift(LOCAL_META_RULES[mi])
+      }
+    }
+    // <<< LOCAL PATCH (meta us)
     // >>> LOCAL PATCH (qiuh) : Google 系全部归到「🔍 Google 服务」
     // 原因（实测 2026-11-04，生成后的 config.yaml + 上游可读规则集逐域名核对）：
     //  1) gvt2.com / gvt3.com / gvt2-cn.com 命中 scki-fused-010-ad-domain，
