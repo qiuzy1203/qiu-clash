@@ -1517,7 +1517,7 @@ function overwriteGeneral(config, nodeDnsHints) {
   config.sniffer = {
     enable: true,
     'parse-pure-ip': true,
-    'force-dns-mapping': true,
+    'force-dns-mapping': false,
     'override-destination': false,
     sniff: {
       HTTP: { ports: ['80', '8080-8880'], 'override-destination': false },
