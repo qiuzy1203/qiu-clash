@@ -1949,9 +1949,28 @@ if (Array.isArray(config.rules)) {
 })()
 // <<< LOCAL PATCH (manual lock)
     log(`[${VERSION}] Done! Groups: ${config['proxy-groups'].length}, Rules: ${config.rules.length}, Providers: ${Object.keys(config['rule-providers']).length}`)
-    return config
+    
+    // >>> v6.0.13 NO-AUTO-INTERFACE (根因修复)
+    // 症状：TUN 开启后 FlClashCore 反复崩溃/重启（17:18-17:27 每几秒死一次），
+    //       DNS 1053 全部 RST，代理端口 7890 消失，UI 却仍显示"运行中"。
+    // 原因：mihomo 顶层 auto-detect-interface=true 与 interface-name 冲突。
+    //       TUN 已接管 0.0.0.0/0，mihomo 自动探测默认出口网卡时，探测流量
+    //       自己走进 TUN，于是探测到"TUN 网卡"这个出口 -> 所有出站被发回
+    //       自己的 TUN -> 无限自环 -> 句柄/内存暴涨 -> 进程被杀。
+    //       旧配置把 0.0.0.0/1~199.19.0.0/16 全 exclude 出 TUN，
+    //       探测永远走物理网卡，所以一直稳定。
+    // 修复：关掉 auto-detect-interface，改由 interface-name 显式钉死物理网卡。
+    try {
+      if (!config.tun) config.tun = {}
+      config.tun['auto-detect-interface'] = false
+      log('[' + VERSION + '] v6.0.13 tun.auto-detect-interface=false (exit self-loop fix)')
+    } catch (e) {
+      log('[' + VERSION + '] v6.0.13 patch error:', e)
+    }
+    // <<< v6.0.13
+return config
   } catch (e) {
     log(`[${VERSION}] Error:`, e)
-    return config
+return config
   }
 }
