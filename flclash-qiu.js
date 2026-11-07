@@ -1697,6 +1697,31 @@ function main(config) {
 
     injectBusinessGroups(config, activeSmartNames)
     applyMihomoFusedRuleSets(config)
+// >>> LOCAL PATCH (qiuh) : GEOIP,CN,DIRECT —— 国内 IP 直连（裸 IP 泄漏修复）
+// 目的：配合 FlClash 的 TUN 全量接管（route-address 0.0.0.0/0），
+//   让裸 IP（无域名、未经 DNS 解析的直连 IP）也进入 TUN 参与分流，
+//   而不是从物理网卡明文直连出去被 ISP / 目标服务器看到。
+// 位置：必须在 applyMihomoFusedRuleSets(config) 之后、所有 RULE-SET 之后、
+//   MATCH,🐟 漏网之鱼 之前 —— 即所有域名规则都匹配不上时，
+//   先用 GeoIP 判断：国内 IP → DIRECT（不消耗机场流量、不增加延迟），
+//   国外 IP → 继续落到 MATCH,🐟 漏网之鱼 走代理。
+// 依赖：Geodata（geoip.metadb / Country.mmdb）已由 FlClash 自动下载。
+// 删除本块即恢复原行为（裸 IP 重新走 MATCH 兜底）。
+if (Array.isArray(config.rules)) {
+  var __geoipCnIdx = -1
+  for (var __gi = 0; __gi < config.rules.length; __gi++) {
+    if (config.rules[__gi] === 'GEOIP,CN,DIRECT') { __geoipCnIdx = __gi; break }
+  }
+  if (__geoipCnIdx < 0) {
+    var __matchIdx = -1
+    for (var __mi = 0; __mi < config.rules.length; __mi++) {
+      if (typeof config.rules[__mi] === 'string' && config.rules[__mi].indexOf('MATCH,') === 0) { __matchIdx = __mi; break }
+    }
+    if (__matchIdx >= 0) config.rules.splice(__matchIdx, 0, 'GEOIP,CN,DIRECT')
+    else config.rules.push('GEOIP,CN,DIRECT')
+  }
+}
+// <<< LOCAL PATCH (geoip cn direct)
     SckiTrafficOptions.applyHealthCheckProfile(config, SCKI_HEALTH_CHECK_PROFILE, 'normal')
     SckiTrafficOptions.applyQuicPolicy(config.rules, SCKI_QUIC_POLICY)
     SckiTrafficOptions.applyZeroTierPlanetProxy(config.rules, SCKI_ZEROTIER_PLANET_PROXY, config['proxy-groups'].map(function(group) { return group.name }))
