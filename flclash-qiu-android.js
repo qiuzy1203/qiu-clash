@@ -1381,6 +1381,15 @@ function overwriteGeneral(config, nodeDnsHints) {
     'cloudflare-dns.com': ['1.1.1.1', '1.0.0.1']
   }
   Object.keys(dnsHosts).forEach(function(k) { config.hosts[k] = dnsHosts[k].slice() })
+  // v6.0.10 NODE-HOSTS: 节点服务器域名必须钉到真实 IP，不能走 fake-ip。
+  // 全量 0.0.0.0/0 接管后 TUN 的 dns-hijack:any:53 会劫持明文 53 查询，
+  // 导致 proxy-server-nameserver-policy 里的节点域名解析成 fake-ip，
+  // 节点建链失败 -> rule-provider 下载失败 -> 国内规则集为空 -> 国内直连失效。
+  // hosts 优先级高于 fake-ip，可直接切断这条自举链。
+  var nodeHostMap = {
+    'q.qiuzy87123.top': ['216.36.114.187']
+  }
+  Object.keys(nodeHostMap).forEach(function(k) { config.hosts[k] = nodeHostMap[k].slice() })
   var bootstrapDns = ['https://223.5.5.5/dns-query', 'https://223.6.6.6/dns-query', 'https://8.8.8.8/dns-query', 'https://1.1.1.1/dns-query', '223.5.5.5']
   var domesticDoH = ['https://dns.alidns.com/dns-query', 'https://doh.pub/dns-query']
   var foreignDoH = ['https://cloudflare-dns.com/dns-query', 'https://dns.google/dns-query']
@@ -1497,13 +1506,21 @@ function overwriteGeneral(config, nodeDnsHints) {
     '+.miwifi.com',
   ]))
   // v5.4.22 #1 借鉴 Proxy-override：QUIC SNI 嗅探（对齐 CMFA/OpenClash）；force-dns-mapping 使真 IP QUIC（fake-ip-filter 域名如 mcdn.bilivideo.cn）也能 GEOSITE 匹配，避免被 NOT,((GEOSITE,cn)) 误拒。
+  // v6.0.11 SNIFFER-NO-OVERRIDE: 全量 0.0.0.0/0 接管 + fake-ip 下，
+  // sniffer.override-destination 会把「纯 IP 连接」的目标改写成 sniff 到的域名，
+  // mihomo 随即去连该域名的 fake-ip(198.18.0.0/16)，而该 fake-ip 又回到自身 TUN，
+  // 形成自环 -> 连接瞬间被 RST（curl: Empty reply from server）。
+  // 症状特征：同一 IP，不带 Host 头正常(200)，带 Host 头立即 Empty reply；
+  // FlClashCore 从不对真实目标 IP 发起 SYN。
+  // 对策：sniffer 仍开启（用于 QUIC/TLS SNI 识别与 GEOIP 判定），
+  // 但禁止 override-destination 覆写目标地址。
   config.sniffer = {
     enable: true,
     'parse-pure-ip': true,
     'force-dns-mapping': true,
-    'override-destination': true,
+    'override-destination': false,
     sniff: {
-      HTTP: { ports: ['80', '8080-8880'], 'override-destination': true },
+      HTTP: { ports: ['80', '8080-8880'], 'override-destination': false },
       TLS: { ports: ['443', '8443'] },
       QUIC: { ports: ['443', '8443', '4433'] }
     },
