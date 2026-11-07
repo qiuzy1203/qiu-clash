@@ -1782,6 +1782,19 @@ if (Array.isArray(config.rules)) {
 //  统一到「🔍 Google 服务」，放在 rules 最前保证先于广告规则匹配。
 //  删除本块即恢复上游默认行为。
 var LOCAL_GOOGLE_RULES = [
+  // ★ 主域 + 全部子域：accounts./drive./mail./docs./sheets./slides./calendar./
+  //   photos./maps./safebrowsing./contacts./groups./keep./tasks./drive.google.com 等
+  //   之前都漏掉了（局部规则只写了 play./dl./gvt./googleapis. 等零散子域），
+  //   主域 google.com 没被覆盖 → 落到第 94 行 scki-fused-021-gfw-domain
+  //   → 「🚫 受限网站」组，与「🔍 Google 服务」分裂成两个出口 IP，
+  //   同一次 Google 登录出现两个 IP 是风控典型特征。
+  'DOMAIN-SUFFIX,google.com,🔍 Google 服务',
+  // ★ .google 顶级域：dns.google / dns.google 的 IPv6 端点等
+  //   （DOMAIN-SUFFIX 按标签边界匹配，notgoogle 之类不会误伤）
+  'DOMAIN-SUFFIX,google,🔍 Google 服务',
+  // Google 中国 CDN / Workspace 相关
+  'DOMAIN-SUFFIX,gstatic.cn,🔍 Google 服务',
+  'DOMAIN-SUFFIX,withgoogle.com,🔍 Google 服务',
   // Play 商店主链路 + APK 托管 CDN（原先被广告规则拦截）
   'DOMAIN-SUFFIX,play.google.com,🔍 Google 服务',
   'DOMAIN-SUFFIX,market.android.com,🔍 Google 服务',
