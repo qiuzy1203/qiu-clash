@@ -1848,6 +1848,11 @@ if (Array.isArray(config.rules)) {
 config.ipv6 = true
 if (!config.dns) config.dns = {}
 config.dns.ipv6 = true
+// IPv6 假地址段：dns.ipv6=true 时若不指定，AAAA 解析没有 fake 地址可分配，
+// mihomo 会退化为 real-ip（把真实 AAAA 交给系统直连）→ 公网 IPv6 绕过代理泄漏。
+// 显式指定后 AAAA 一律返回 2600:fe:dcba:9876::/64 内的假地址，
+// 由 TUN 的 route-address 收进隧道。
+if (!config.dns['fake-ip-range6']) config.dns['fake-ip-range6'] = '2600:fe:dcba:9876::/64'
 // <<< LOCAL PATCH (ipv6)
 // >>> LOCAL PATCH (qiuh) : 手动锁定组 + 业务组默认成员
 // url-test 每 300 秒按延迟自动换节点：账号/支付/流媒体对出口 IP 敏感，会触发风控或掉解锁；
