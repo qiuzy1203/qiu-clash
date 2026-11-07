@@ -1505,6 +1505,12 @@ function overwriteGeneral(config, nodeDnsHints) {
     '+.gotui.com',
     '+.miwifi.com',
   ]))
+  // v6.0.12 FAKE-IP-FILTER-CN: 国内域名必须返回真实 IP，不能走 fake-ip。
+  // 原因：sniffer 提取到域名后 mihomo 会重新解析该域名，fake-ip 模式下拿到
+  // 198.18.0.0/16 里的假地址，于是去连自己的 TUN -> 自环 -> 瞬间 RST。
+  // 症状：同一 IP 不带 Host 头正常(200)，带 Host 头立即 Empty reply。
+  // 把 geosite:cn 放进 fake-ip-filter，国内域名直接给真实 IP，绕开整条假地址链路。
+  config.dns['fake-ip-filter'] = uniqList(config.dns['fake-ip-filter'].concat(['geosite:cn']))
   // v5.4.22 #1 借鉴 Proxy-override：QUIC SNI 嗅探（对齐 CMFA/OpenClash）；force-dns-mapping 使真 IP QUIC（fake-ip-filter 域名如 mcdn.bilivideo.cn）也能 GEOSITE 匹配，避免被 NOT,((GEOSITE,cn)) 误拒。
   // v6.0.11 SNIFFER-NO-OVERRIDE: 全量 0.0.0.0/0 接管 + fake-ip 下，
   // sniffer.override-destination 会把「纯 IP 连接」的目标改写成 sniff 到的域名，
